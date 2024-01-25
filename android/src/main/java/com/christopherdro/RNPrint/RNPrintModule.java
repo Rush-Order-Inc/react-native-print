@@ -46,7 +46,6 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
     ReactApplicationContext reactContext;
     final String defaultJobName = "Document";
 
-
     public RNPrintModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.reactContext = reactContext;
@@ -67,9 +66,11 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
         final boolean isLandscape = options.hasKey("isLandscape") ? options.getBoolean("isLandscape") : false;
         final String jobName = options.hasKey("jobName") ? options.getString("jobName") : defaultJobName;
         final String baseUrl = options.hasKey("baseUrl") ? options.getString("baseUrl") : null;
+        final String authHeaderValue = options.hasKey("authHeaderValue") ? options.getString("authHeaderValue") : "";
 
         if ((html == null && filePath == null) || (html != null && filePath != null)) {
-            promise.reject(getName(), "Must provide either `html` or `filePath`.  Both are either missing or passed together");
+            promise.reject(getName(),
+                    "Must provide either `html` or `filePath`.  Both are either missing or passed together");
             return;
         }
 
@@ -89,27 +90,31 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
                             public void onPageFinished(WebView view, String url) {
                                 // Get the print manager.
                                 PrintManager printManager = (PrintManager) getCurrentActivity().getSystemService(
-                                                                                                                 Context.PRINT_SERVICE);
+                                        Context.PRINT_SERVICE);
                                 // Create a wrapper PrintDocumentAdapter to clean up when done.
                                 PrintDocumentAdapter adapter = new PrintDocumentAdapter() {
-                                    private final PrintDocumentAdapter mWrappedInstance =
-                                    mWebView.createPrintDocumentAdapter(jobName);
+                                    private final PrintDocumentAdapter mWrappedInstance = mWebView
+                                            .createPrintDocumentAdapter(jobName);
+
                                     @Override
                                     public void onStart() {
                                         mWrappedInstance.onStart();
                                     }
+
                                     @Override
                                     public void onLayout(PrintAttributes oldAttributes, PrintAttributes newAttributes,
-                                                         CancellationSignal cancellationSignal, LayoutResultCallback callback,
-                                                         Bundle extras) {
+                                            CancellationSignal cancellationSignal, LayoutResultCallback callback,
+                                            Bundle extras) {
                                         mWrappedInstance.onLayout(oldAttributes, newAttributes, cancellationSignal,
-                                                                  callback, extras);
+                                                callback, extras);
                                     }
+
                                     @Override
                                     public void onWrite(PageRange[] pages, ParcelFileDescriptor destination,
-                                                        CancellationSignal cancellationSignal, WriteResultCallback callback) {
+                                            CancellationSignal cancellationSignal, WriteResultCallback callback) {
                                         mWrappedInstance.onWrite(pages, destination, cancellationSignal, callback);
                                     }
+
                                     @Override
                                     public void onFinish() {
                                         mWrappedInstance.onFinish();
@@ -139,7 +144,8 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
                 PrintDocumentAdapter pda = new PrintDocumentAdapter() {
 
                     @Override
-                    public void onWrite(PageRange[] pages, final ParcelFileDescriptor destination, CancellationSignal cancellationSignal, final WriteResultCallback callback){
+                    public void onWrite(PageRange[] pages, final ParcelFileDescriptor destination,
+                            CancellationSignal cancellationSignal, final WriteResultCallback callback) {
                         try {
                             boolean isUrl = URLUtil.isValidUrl(filePath);
 
@@ -150,11 +156,13 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
 
                                         try {
                                             OkHttpClient client = OkHttpClientProvider.createClient();
-                                            ForwardingCookieHandler cookieHandler = new ForwardingCookieHandler(reactContext);
+                                            ForwardingCookieHandler cookieHandler = new ForwardingCookieHandler(
+                                                    reactContext);
                                             cookieJarContainer = (CookieJarContainer) client.cookieJar();
                                             cookieJarContainer.setCookieJar(new JavaNetCookieJar(cookieHandler));
 
-                                            Request.Builder requestBuilder = new Request.Builder().url(filePath);
+                                            Request.Builder requestBuilder = new Request.Builder().url(filePath)
+                                                    .header("Authorization", authHeaderValue);
                                             Response res = client.newCall(requestBuilder.build()).execute();
 
                                             loadAndClose(destination, callback, res.body().byteStream());
@@ -174,7 +182,7 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
                                 loadAndClose(destination, callback, input);
                             }
 
-                        } catch (FileNotFoundException ee){
+                        } catch (FileNotFoundException ee) {
                             promise.reject(getName(), "File not found");
                         } catch (Exception e) {
                             // Catch exception
@@ -183,14 +191,16 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
                     }
 
                     @Override
-                    public void onLayout(PrintAttributes oldAttributes, PrintAttributes newAttributes, CancellationSignal cancellationSignal, LayoutResultCallback callback, Bundle extras){
+                    public void onLayout(PrintAttributes oldAttributes, PrintAttributes newAttributes,
+                            CancellationSignal cancellationSignal, LayoutResultCallback callback, Bundle extras) {
 
                         if (cancellationSignal.isCanceled()) {
                             callback.onLayoutCancelled();
                             return;
                         }
 
-                        PrintDocumentInfo pdi = new PrintDocumentInfo.Builder(jobName).setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build();
+                        PrintDocumentInfo pdi = new PrintDocumentInfo.Builder(jobName)
+                                .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build();
 
                         callback.onLayoutFinished(pdi, true);
                     }
@@ -202,7 +212,8 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
                 };
 
                 PrintAttributes printAttributes = new PrintAttributes.Builder()
-                        .setMediaSize(isLandscape?PrintAttributes.MediaSize.UNKNOWN_LANDSCAPE:PrintAttributes.MediaSize.UNKNOWN_PORTRAIT)
+                        .setMediaSize(isLandscape ? PrintAttributes.MediaSize.UNKNOWN_LANDSCAPE
+                                : PrintAttributes.MediaSize.UNKNOWN_PORTRAIT)
                         .build();
                 printManager.print(jobName, pda, printAttributes);
 
@@ -212,8 +223,8 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
         }
     }
 
-
-    private void loadAndClose(ParcelFileDescriptor destination, PrintDocumentAdapter.WriteResultCallback callback, InputStream input) throws IOException {
+    private void loadAndClose(ParcelFileDescriptor destination, PrintDocumentAdapter.WriteResultCallback callback,
+            InputStream input) throws IOException {
         OutputStream output = null;
         output = new FileOutputStream(destination.getFileDescriptor());
 
@@ -224,7 +235,7 @@ public class RNPrintModule extends ReactContextBaseJavaModule {
             output.write(buf, 0, bytesRead);
         }
 
-        callback.onWriteFinished(new PageRange[]{PageRange.ALL_PAGES});
+        callback.onWriteFinished(new PageRange[] { PageRange.ALL_PAGES });
 
         try {
             input.close();
